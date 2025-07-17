@@ -31,7 +31,7 @@ def load_browser_cookie(browser: str) -> List[Cookie]:
 
 if __name__ == "__main__":
     # 测试代码
-    cookie = load_browser_cookie('firefox')
+    cookie = load_browser_cookie('edge')
     print(cookie)
     # cookie = load_browser_cookie_or_none("chrome")
     # print(cookie)

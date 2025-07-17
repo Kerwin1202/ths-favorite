@@ -89,7 +89,6 @@ class THSHttpApiClient:
         self.base_url: str = base_url.rstrip('/')
         logger.debug(f"THSHttpApiClient 初始化: base_url='{self.base_url}', http2={http2}, timeout={timeout}s")
         self._internal_cookies: Dict[str, str] = {}
-
         if client:
             self._client: httpx.Client = client
             self._is_external_client: bool = True
@@ -104,7 +103,7 @@ class THSHttpApiClient:
                 self.set_cookies(cookies)
             elif os.environ.get("AUTO_LOAD_BROWSER_COOKIES", "true").lower() == "true":
                 logger.info("未直接提供cookies，且 AUTO_LOAD_BROWSER_COOKIES 环境变量为 true，尝试从浏览器加载...")
-                self.load_cookies_from_browser("firefox") # 示例浏览器
+                self.load_cookies_from_browser("edge") # 示例浏览器
             else:
                 logger.warning("未提供cookies，且未启用从浏览器自动加载cookies功能。请求可能因缺少认证而失败。")
 
@@ -237,6 +236,13 @@ class THSHttpApiClient:
         if 'Content-Type' not in custom_headers and 'content-type' not in custom_headers:
              custom_headers['Content-Type'] = 'application/x-www-form-urlencoded; charset=utf-8'
         return self.request("POST", endpoint, data=data, headers=custom_headers, **kwargs)
+    
+    def post_form_json(self, endpoint: str, data: Optional[Dict[str, Any]] = None, **kwargs: Any) -> Dict[str, Any]:
+        custom_headers: Dict[str, str] = kwargs.pop('headers', {})
+        if 'Content-Type' not in custom_headers and 'content-type' not in custom_headers:
+             custom_headers['Content-Type'] = 'application/json; charset=utf-8'
+        print(custom_headers)
+        return self.request("POST", endpoint, json_payload=data, headers=custom_headers, **kwargs)
 
     def post_json(self, endpoint: str, json_payload: Optional[Any] = None, **kwargs: Any) -> Dict[str, Any]:
         return self.request("POST", endpoint, json_payload=json_payload, **kwargs)
@@ -269,6 +275,9 @@ class THSUserFavorite:
     _QUERY_ENDPOINT: str = "/optdata/selfgroup/open/api/group/v1/query"
     _ADD_ITEM_ENDPOINT: str = "/optdata/selfgroup/open/api/content/v1/add"
     _DELETE_ITEM_ENDPOINT: str = "/optdata/selfgroup/open/api/content/v1/delete"
+    _ADD_GROUP_ENDPOINT: str = "/optdata/selfgroup/open/api/group/v1/add"
+    _DELETED_GROUP_ENDPOINT: str = "/optdata/selfgroup/open/api/group/v1/delete"
+    _SHARE_GROUP_ENDPOINT: str = "/optdata/sharing_service/open/api/sharing/v1/create"
     _CACHE_FILE: str = "ths_favorite_cache.json"
 
     def __init__(self,
@@ -583,6 +592,159 @@ class THSUserFavorite:
             logger.error(f"{action_name}项目API返回了非预期的格式: {type(api_response)}")
         return None
 
+    def _modify_group_api_call(self,
+                                    endpoint: str,
+                                    group_id: str,
+                                    action_name: str = "操作"
+                                   ) -> Optional[Dict[str, Any]]:
+        logger.info(f"准备 {action_name} 项目分组ID '{group_id}'，API端点: {endpoint}")
+
+        if self._current_version is None:
+            self.get_all_groups(use_cache=False)
+
+        # 添加  from=sjcg_gphone&name=%E6%B5%8B%E8%AF%95&type=0&version=15474
+        # 删除  from=sjcg_gphone&ids=123456&version=15474
+
+        payload: Dict[str, str] = {
+            "version": str(self._current_version),
+            "from": "sjcg_gphone",
+            "name": group_id, # 添加的时候用的这个
+            "ids": group_id,  # 删除的时候用的这个
+            "type": f"0",
+        }
+        logger.debug(f"{action_name}项目API请求载荷: {payload}")
+        
+        api_response: Optional[Dict[str, Any]] = None
+        try:
+            api_response = self.api_client.post_form_urlencoded(endpoint, data=payload)
+        except httpx.HTTPStatusError as e:
+            logger.error(f"{action_name}项目API HTTP错误 (已由APIClient记录): {e.response.status_code}")
+            return None
+        except httpx.RequestError as e:
+            logger.error(f"{action_name}项目API请求错误 (已由APIClient记录): {e}")
+            return None
+        except json.JSONDecodeError as e:
+            logger.error(f"{action_name}项目API响应JSON解析错误 (已由APIClient记录): {e}")
+            return None
+        except Exception as e:
+            logger.exception(f"{action_name}项目API调用时发生未预料的错误。")
+            return None
+
+        if api_response and isinstance(api_response, dict) and api_response.get("status_code") == 0:
+            data: Optional[Dict[str, Any]] = api_response.get("data")
+            self._update_version_from_response_data(data)
+            logger.info(f"项目分组 '{group_id}' 成功。新版本: {self._current_version}")
+            return data
+        elif api_response and isinstance(api_response, dict):
+            status_msg: str = api_response.get("status_msg", "未知业务错误")
+            status_code: int = api_response.get("status_code", -1)
+            logger.error(f"{action_name}项目API业务逻辑错误: {status_msg} (代码: {status_code})")
+        elif api_response is not None:
+            logger.error(f"{action_name}项目API返回了非预期的格式: {type(api_response)}")
+        return None
+
+    def _share_group_api_call(self,
+                                    endpoint: str,
+                                    group_id: str,
+                                    group_name: str,
+                                    time: int,
+                                    action_name: str = "操作"
+                                   ) -> Optional[Dict[str, Any]]:
+        logger.info(f"准备 {action_name} 项目分组ID '{group_id}' 分组 '{group_name}'，API端点: {endpoint}")
+
+        payload: Dict[str, str] = {
+            "biz": 'selfstock',
+            "valid_time": time,
+            "biz_key": f"{self.api_client.get_cookies()["userid"]}_{group_id.split('_')[1]}",
+            "name": group_name,
+            "url_style": 0,
+        }
+        logger.debug(f"{action_name}项目API请求载荷: {payload}")
+        
+        api_response: Optional[Dict[str, Any]] = None
+        try:
+            api_response = self.api_client.post_form_json(endpoint, data=payload)
+        except httpx.HTTPStatusError as e:
+            logger.error(f"{action_name}项目API HTTP错误 (已由APIClient记录): {e.response.status_code}")
+            return None
+        except httpx.RequestError as e:
+            logger.error(f"{action_name}项目API请求错误 (已由APIClient记录): {e}")
+            return None
+        except json.JSONDecodeError as e:
+            logger.error(f"{action_name}项目API响应JSON解析错误 (已由APIClient记录): {e}")
+            return None
+        except Exception as e:
+            logger.exception(f"{action_name}项目API调用时发生未预料的错误。")
+            return None
+
+        if api_response and isinstance(api_response, dict) and api_response.get("status_code") == 0:
+            data: Optional[Dict[str, Any]] = api_response.get("data")
+            logger.info(f"分享项目分组 '{group_id}' 成功。链接: {data["share_url"]}")
+            return data
+        elif api_response and isinstance(api_response, dict):
+            status_msg: str = api_response.get("status_msg", "未知业务错误")
+            status_code: int = api_response.get("status_code", -1)
+            logger.error(f"{action_name}项目API业务逻辑错误: {status_msg} (代码: {status_code})")
+        elif api_response is not None:
+            logger.error(f"{action_name}项目API返回了非预期的格式: {type(api_response)}")
+        return None
+
+
+    def add_group(self, group_identifier: str) -> Optional[Dict[str, Any]]:
+        logger.info(f"尝试添加分组 '{group_identifier}'...")
+        api_result = self._modify_group_api_call(
+            self._ADD_GROUP_ENDPOINT,
+            group_identifier,
+            action_name="添加"
+        )
+
+        if api_result:
+            logger.info(f"添加分组 '{group_identifier}' 最终成功。")
+            self.get_all_groups(use_cache=False)
+        else:
+            logger.error(f"添加分组 '{group_identifier}' 最终失败。")
+        return api_result
+    
+    def delete_group(self, group_identifier: str) -> Optional[Dict[str, Any]]:
+        logger.info(f"尝试删除项目分组 '{group_identifier}'...")
+        target_group_id: Optional[str] = self._get_group_id_by_identifier(group_identifier)
+        if not target_group_id:
+            logger.error(f"删除项目失败: 未能找到分组 '{group_identifier}'。")
+            return None
+
+        api_result = self._modify_group_api_call(
+            self._DELETED_GROUP_ENDPOINT,
+            target_group_id,
+            action_name="删除"
+        )
+
+        if api_result:
+            logger.info(f"删除项目分组 '{group_identifier}' 删除API调用成功，正在刷新分组缓存...")
+            self.get_all_groups(use_cache=False)
+        else:
+            logger.error(f"删除项目分组 '{group_identifier}' 最终失败。")
+        return api_result
+
+    def share_group(self, group_identifier: str, time: int) -> Optional[Dict[str, Any]]:
+        logger.info(f"尝试分享分组 '{group_identifier}'...")
+        target_group_id: Optional[str] = self._get_group_id_by_identifier(group_identifier)
+        if not target_group_id:
+            logger.error(f"分享分组失败: 未能找到分组 '{group_identifier}'。")
+            return None
+
+        api_result = self._share_group_api_call(
+            self._SHARE_GROUP_ENDPOINT,
+            target_group_id,
+            group_identifier,
+            time,
+            action_name="分享"
+        )
+
+        if api_result:
+            logger.info(f"分享分组 '{group_identifier}' 分享API调用成功，正在刷新分组缓存...")
+        else:
+            logger.error(f"分享分组 '{group_identifier}' 最终失败。")
+        return api_result
 
     def add_item_to_group(self, group_identifier: str, code_with_market_suffix: str) -> Optional[Dict[str, Any]]:
         logger.info(f"尝试添加项目 '{code_with_market_suffix}' 到分组 '{group_identifier}'...")

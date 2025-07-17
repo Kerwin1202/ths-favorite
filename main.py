@@ -48,6 +48,19 @@ def main():
     del_parser.add_argument("group", help="分组名称或ID")
     del_parser.add_argument("stock", help="股票代码，格式: code.market (如: 600519.SH)")
     
+    # add 命令
+    add_group_parser = subparsers.add_parser("addgroup", help="添加分组")
+    add_group_parser.add_argument("group", help="分组名称或ID")
+    
+    # delete 命令
+    del_group_parser = subparsers.add_parser("deletegroup", help="删除分组")
+    del_group_parser.add_argument("group", help="分组名称或ID")
+
+    # share 命令
+    share_parser = subparsers.add_parser("share", help="分享分组")
+    share_parser.add_argument("group", help="分组名称或ID")
+    share_parser.add_argument("time", help="多少毫秒后过期, 有效期 0 是永久")
+    
     args = parser.parse_args()
     
     # 创建 THSUserGroups 实例
@@ -66,6 +79,18 @@ def main():
             result = ths.delete_item_from_group(args.group, args.stock)
             if result:
                 print(f"已成功从分组 '{args.group}' 删除 {args.stock}")
+        elif args.command == "addgroup":
+            result = ths.add_group(args.group)
+            if result:
+                print(f"已成功添加分组 '{args.group}'")
+        elif args.command == "deletegroup":
+            result = ths.delete_group(args.group)
+            if result:
+                print(f"已成功删除分组 '{args.group}'")
+        elif args.command == "share":
+            result = ths.share_group(args.group, args.time)
+            if result:
+                print(f"已成功分享分组 '{args.group}'")
         else:
             parser.print_help()
             sys.exit(1)
