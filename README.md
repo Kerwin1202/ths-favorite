@@ -52,6 +52,14 @@ with THSUserFavorite() as ths:
     ths.delete_item_from_group("消费", "600519.SH")
 ```
 
+### Api
+- http://127.0.0.1:8166/list_groups
+- http://127.0.0.1:8166/list_stocks?name=%E6%97%A0%E4%BA%BA
+- http://127.0.0.1:8166/add_group?group=717
+- http://127.0.0.1:8166/delete_group?group=717
+- http://127.0.0.1:8166/add_stocks?group=717&stock=000858.SZ
+- http://127.0.0.1:8166/delete_stocks?group=717&stock=000858.SZ
+
 ### 股票代码格式
 
 添加或删除股票时，股票代码格式为 `code.market`，其中:

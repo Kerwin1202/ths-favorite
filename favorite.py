@@ -542,17 +542,7 @@ class THSUserFavorite:
         logger.info(f"准备 {action_name} 项目 '{item_code}' (类型: {api_item_type_code}) 到分组ID '{group_id}'，API端点: {endpoint}")
 
         if self._current_version is None:
-            logger.error(f"{action_name}项目失败：未能确定有效的自选列表版本号。请先成功调用 get_all_groups()。")
-            # 考虑是否在此处强制获取版本，或者让上层逻辑处理
-            # logger.info("尝试自动获取最新版本号...")
-            # self.get_all_groups(use_cache=False)
-            # if self._current_version is None:
-            #     logger.error("仍然无法获取版本号，操作终止。")
-            #     return None
-            # else:
-            #     logger.info(f"已获取到最新版本号: {self._current_version}，继续操作...")
-            return None
-
+            self.get_all_groups(use_cache=False)
 
         payload: Dict[str, str] = {
             "version": str(self._current_version),

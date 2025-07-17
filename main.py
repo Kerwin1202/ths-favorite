@@ -4,18 +4,34 @@
 import argparse
 import sys
 from favorite import THSUserFavorite
+from flask import Flask, request, jsonify, send_from_directory, make_response, render_template
+from flask_cors import CORS
 
+app = Flask(__name__)
+CORS(app)
 
-def list_groups(ths: THSUserFavorite):
+ths = None  # 全局变量
+
+@app.route("/list_groups", methods=["GET"])
+def list_groups():
     """列出所有分组及其股票数量"""
     groups = ths.get_all_groups()
     print(f"共有 {len(groups)} 个分组:")
-    
+    result = []
     for name, group in groups.items():
-        print(f"- {name} (ID: {group.group_id}, 股票数量: {len(group.items)})")
+        result.append({
+            "name": name,
+            "group_id": group.group_id,
+            "count": len(group.items)
+        })
+    return jsonify(result)
 
+@app.route("/list_stocks", methods=["GET"])
+def list_stocks():
+    group_name = request.args.get("group")
+    if not group_name:
+        return jsonify({"error": "请传入参数 ?group=xxx"}), 400
 
-def list_stocks(ths: THSUserFavorite, group_name: str):
     """列出指定分组中的所有股票"""
     groups = ths.get_all_groups()
     
@@ -26,9 +42,93 @@ def list_stocks(ths: THSUserFavorite, group_name: str):
     group = groups[group_name]
     print(f"分组 '{group_name}' (ID: {group.group_id}) 包含 {len(group.items)} 个股票:")
     
+    result = []
     for item in group.items:
-        print(f"- {item.code}.{item.market}")
+        # print(f"- {item.code}.{item.market}")
+        result.append({
+            "code": item.code,
+            "market": item.market,
+        })
+    return jsonify(result)
 
+
+@app.route("/add_stocks", methods=["GET"])
+def add_stocks():
+    group_name = request.args.get("group")
+    stock_code = request.args.get("stock")
+    
+    if not group_name or not stock_code:
+        return jsonify({"error": "请传入参数 ?group=xxx&stock=xxx"}), 400
+
+    """添加股票到指定分组"""
+    result = ths.add_item_to_group(group_name, stock_code)
+    if result:
+        print(f"已成功添加 {stock_code} 到分组 '{group_name}'")
+        return jsonify({"message": f"已成功添加 {stock_code} 到分组 '{group_name}'"})
+    else:
+        return jsonify({"error": "添加失败"}), 500
+    
+@app.route("/delete_stocks", methods=["GET"])
+def delete_stocks():
+    group_name = request.args.get("group")
+    stock_code = request.args.get("stock")
+    
+    if not group_name or not stock_code:
+        return jsonify({"error": "请传入参数 ?group=xxx&stock=xxx"}), 400
+
+    """从指定分组删除股票"""
+    result = ths.delete_item_from_group(group_name, stock_code)
+    if result:
+        print(f"已成功从分组 '{group_name}' 删除 {stock_code}")
+        return jsonify({"message": f"已成功从分组 '{group_name}' 删除 {stock_code}"})
+    else:
+        return jsonify({"error": "删除失败"}), 500
+    
+@app.route("/add_group", methods=["GET"])
+def add_group():
+    group_name = request.args.get("name")
+    
+    if not group_name:
+        return jsonify({"error": "请传入参数 ?name=xxx"}), 400
+
+    """添加新分组"""
+    result = ths.add_group(group_name)
+    if result:
+        print(f"已成功添加分组 '{group_name}'")
+        return jsonify({"message": f"已成功添加分组 '{group_name}'"})
+    else:
+        return jsonify({"error": "添加分组失败"}), 500
+    
+@app.route("/delete_group", methods=["GET"])
+def delete_group():
+    group_name = request.args.get("group")
+    
+    if not group_name:
+        return jsonify({"error": "请传入参数 ?group=xxx"}), 400
+
+    """删除指定分组"""
+    result = ths.delete_group(group_name)
+    if result:
+        print(f"已成功删除分组 '{group_name}'")
+        return jsonify({"message": f"已成功删除分组 '{group_name}'"})
+    else:
+        return jsonify({"error": "删除分组失败"}), 500
+
+@app.route("/share_group", methods=["GET"])
+def share_group():
+    group_name = request.args.get("group")
+    expire_time = request.args.get("time")
+    
+    if not group_name or not expire_time:
+        return jsonify({"error": "请传入参数 ?group=xxx&time=xxx"}), 400
+
+    """分享分组"""
+    result = ths.share_group(group_name, expire_time)
+    if result:
+        print(f"已成功分享分组 '{group_name}'")
+        return jsonify({"message": f"已成功分享分组 '{group_name}'"})
+    else:
+        return jsonify({"error": "分享分组失败"}), 500
 
 def main():
     parser = argparse.ArgumentParser(description="同花顺自选股管理工具")
@@ -97,4 +197,9 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    #main()
+    ths = THSUserFavorite()
+    try:
+        app.run(host="0.0.0.0", port=8166, debug=True)
+    finally:
+        print("🔌 已断开行情服务器")

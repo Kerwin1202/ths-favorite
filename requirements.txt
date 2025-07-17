@@ -1,3 +1,5 @@
 httpx
 loguru
 browser-cookie3
+flask_cors
+flask
