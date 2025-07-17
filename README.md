@@ -54,7 +54,7 @@ with THSUserFavorite() as ths:
 
 ### Api
 - http://127.0.0.1:8166/list_groups
-- http://127.0.0.1:8166/list_stocks?name=%E6%97%A0%E4%BA%BA
+- http://127.0.0.1:8166/list_stocks?group=%E6%97%A0%E4%BA%BA
 - http://127.0.0.1:8166/add_group?group=717
 - http://127.0.0.1:8166/delete_group?group=717
 - http://127.0.0.1:8166/add_stocks?group=717&stock=000858.SZ

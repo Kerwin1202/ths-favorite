@@ -645,7 +645,7 @@ class THSUserFavorite:
         payload: Dict[str, str] = {
             "biz": 'selfstock',
             "valid_time": time,
-            "biz_key": f"{self.api_client.get_cookies()["userid"]}_{group_id.split('_')[1]}",
+            "biz_key": f"{self.api_client.get_cookies()['userid']}_{group_id.split('_')[1]}",
             "name": group_name,
             "url_style": 0,
         }
@@ -669,7 +669,7 @@ class THSUserFavorite:
 
         if api_response and isinstance(api_response, dict) and api_response.get("status_code") == 0:
             data: Optional[Dict[str, Any]] = api_response.get("data")
-            logger.info(f"分享项目分组 '{group_id}' 成功。链接: {data["share_url"]}")
+            logger.info(f"分享项目分组 '{group_id}' 成功。链接: {data['share_url']}")
             return data
         elif api_response and isinstance(api_response, dict):
             status_msg: str = api_response.get("status_msg", "未知业务错误")
