@@ -86,10 +86,10 @@ def delete_stocks():
     
 @app.route("/add_group", methods=["GET"])
 def add_group():
-    group_name = request.args.get("name")
+    group_name = request.args.get("group")
     
     if not group_name:
-        return jsonify({"error": "请传入参数 ?name=xxx"}), 400
+        return jsonify({"error": "请传入参数 ?group=xxx"}), 400
 
     """添加新分组"""
     result = ths.add_group(group_name)

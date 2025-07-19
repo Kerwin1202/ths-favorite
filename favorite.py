@@ -578,6 +578,9 @@ class THSUserFavorite:
             status_msg: str = api_response.get("status_msg", "未知业务错误")
             status_code: int = api_response.get("status_code", -1)
             logger.error(f"{action_name}项目API业务逻辑错误: {status_msg} (代码: {status_code})")
+            if "version outdated" in status_msg.lower():
+                self.get_all_groups(use_cache=False)
+                return self._modify_group_item_api_call(endpoint, group_id, item_code, api_item_type_code, action_name)
         elif api_response is not None:
             logger.error(f"{action_name}项目API返回了非预期的格式: {type(api_response)}")
         return None
@@ -629,6 +632,9 @@ class THSUserFavorite:
             status_msg: str = api_response.get("status_msg", "未知业务错误")
             status_code: int = api_response.get("status_code", -1)
             logger.error(f"{action_name}项目API业务逻辑错误: {status_msg} (代码: {status_code})")
+            if "version outdated" in status_msg.lower():
+                self.get_all_groups(use_cache=False)
+                return self._modify_group_api_call(endpoint, group_id, action_name)
         elif api_response is not None:
             logger.error(f"{action_name}项目API返回了非预期的格式: {type(api_response)}")
         return None
@@ -675,6 +681,9 @@ class THSUserFavorite:
             status_msg: str = api_response.get("status_msg", "未知业务错误")
             status_code: int = api_response.get("status_code", -1)
             logger.error(f"{action_name}项目API业务逻辑错误: {status_msg} (代码: {status_code})")
+            if "version outdated" in status_msg.lower():
+                self.get_all_groups(use_cache=False)
+                return self._share_group_api_call(endpoint, group_id, group_name, time, action_name)
         elif api_response is not None:
             logger.error(f"{action_name}项目API返回了非预期的格式: {type(api_response)}")
         return None
